@@ -1,39 +1,28 @@
 #!/bin/bash
-# This script will monitor a specified directory for new files or directories created in it.
+# This script monitors a specified directory for new files or directories.
+
 specifiedDir="$1"
 if [ -z "$specifiedDir" ]; then
     echo "Usage: $0 <directory_to_monitor>"
     exit 1
 fi
 
-tempFile="/tmp/monitorTemp$$.txt"
-touch "$tempFile"
+# Initial snapshot of the directory
+initialSnapshot=$(find "$specifiedDir" -type f -o -type d)
 
-cleanup() {
-    rm -f "$tempFile" "$newFiles"
-    echo "Temporary files cleaned up. Exiting."
-    exit 0
-}
-
-trap cleanup SIGINT SIGTERM
-
-checkNewFiles() {
-    local newFiles="/tmp/monitorNewFiles$$.txt"
-    find "$specifiedDir" -type f -o -type d > "$newFiles"
-
-    comm -13 "$tempFile" "$newFiles" > /tmp/newlyCreated$$.txt
-
-    cat /tmp/newlyCreated$$.txt >> "$tempFile"
-
-    cat /tmp/newlyCreated$$.txt
-
-    rm -f /tmp/newlyCreated$$.txt
-    rm -f "$newFiles"
-}
+trap "echo 'Exiting.'; exit 0" SIGINT SIGTERM
 
 while true; do
-    echo "Checking for changes in $specifiedDir..."
-    checkNewFiles
-    echo "Sleeping for 10 seconds..."
+    currentSnapshot=$(find "$specifiedDir" -type f -o -type d)
+    
+    # Compare and show new files or directories
+    newItems=$(comm -13 <(echo "$initialSnapshot") <(echo "$currentSnapshot"))
+    
+    if [ -n "$newItems" ]; then
+        echo "New items detected:"
+        echo "$newItems"
+        initialSnapshot="$currentSnapshot"
+    fi
+    
     sleep 10
 done
